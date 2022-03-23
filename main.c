@@ -66,6 +66,11 @@ void executeAndWait(char **userArgs)
    }
 }
 
+void historyCommand(char *userString)
+{
+   
+}
+
 int main()
 {
 
@@ -92,7 +97,20 @@ int main()
       // If command is cd
       if (strcmp(userArgs[0], "cd") == 0)
       {
-         cdCommand(userArgs[1]);
+         if (userArgs[1] == NULL)
+         {
+            cdCommand(OGdirectory);
+         }
+         else
+         {
+            cdCommand(userArgs[1]);
+         }
+      }
+
+      // If command is history
+      if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
+      {
+         historyCommand(userArgs[1]);
       }
 
       // Run built-in normal commands
