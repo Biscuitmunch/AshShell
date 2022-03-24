@@ -66,9 +66,34 @@ void executeAndWait(char **userArgs)
    }
 }
 
-void historyCommand(char *userString)
+void historyCommand(char *commandType, char **historyOfUser)
 {
    
+   for (int i = 1; i <= 10; i++)
+   {
+      printf("%d: %s\n", i, historyOfUser[i-1]);
+
+      if (historyOfUser[i]==NULL)
+      {
+         break;
+      }
+   }
+
+}
+
+void addToHistory(char *userString, char **historyOfUser)
+{
+
+   for (int i = 9; i > 0; i--)
+   {
+      historyOfUser[i] = historyOfUser[i-1];
+   }
+
+   char *temp = malloc(1000);
+   strcpy(temp, userString);
+
+   historyOfUser[0] = temp;
+
 }
 
 int main()
@@ -81,6 +106,9 @@ int main()
    char *OGdirectory = malloc(1000);
    getcwd(OGdirectory, 1000);
 
+   // History variable
+   char **historyCommands = malloc(1000);
+
    while (strcmp(fullCommand, "exit") != 0)
    {
       // Resetting the users old line
@@ -88,6 +116,9 @@ int main()
 
       // Taking the users full line
       fullCommand = readLine();
+
+      // Adding this to command history
+      addToHistory(fullCommand, historyCommands);
 
       // Resetting an args 2d array
       char **userArgs = malloc(1000);
@@ -108,9 +139,9 @@ int main()
       }
 
       // If command is history
-      if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
+      else if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
       {
-         historyCommand(userArgs[1]);
+         historyCommand(userArgs[1], historyCommands);
       }
 
       // Run built-in normal commands
@@ -118,6 +149,9 @@ int main()
       {
          executeAndWait(userArgs);
       }
+
+      free(userArgs);
+
    }
 
    return 0;
