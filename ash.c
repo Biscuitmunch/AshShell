@@ -6,11 +6,13 @@
 
 char *readLine(void)
 {
+   printf("ash> ");
    char *fullLine = malloc(1000);
    int adder = 0;
 
    while (1)
    {
+
 
       char in = fgetc(stdin);
 
@@ -18,6 +20,13 @@ char *readLine(void)
       {
          // ending on null byte
          fullLine[adder] = '\0';
+
+         if (fullLine[0] == '\0')
+         {
+            printf("ash> ");
+            continue;
+         }
+
          return fullLine;
       }
 
@@ -68,16 +77,52 @@ void executeAndWait(char **userArgs)
 
 void historyCommand(char *commandType, char **historyOfUser)
 {
-   
-   for (int i = 1; i <= 10; i++)
+   if (historyOfUser[0]==NULL)
    {
-      printf("%d: %s\n", i, historyOfUser[i-1]);
-
-      if (historyOfUser[i]==NULL)
+      printf("No history\n");
+      return;
+   }
+   
+   if (commandType==NULL)
+   {
+      for (int i = 1; i <= 10; i++)
       {
-         break;
+         printf("%d: %s\n", i, historyOfUser[i-1]);
+
+         if (historyOfUser[i]==NULL)
+         {
+            break;
+         }
       }
    }
+
+   else
+   {
+      // Getting the history value wanted
+      char *extraString;
+      char *historyWanted = malloc(1000);
+      strcpy(historyWanted, commandType);
+
+      // Converting to int to get the history string
+      long histNum = strtol(historyWanted, &extraString, 10);
+      char *fullCommandWanted = malloc(1000);
+
+      // if doesnt exist, return
+      if (historyOfUser[histNum-1]==NULL)
+      {
+         printf("That value has no history!\n");
+         return;
+      }
+
+      strcpy(fullCommandWanted, historyOfUser[histNum-1]);
+
+      // Running the history command
+      char **historyArgs = malloc(1000);
+      splitToArgs(fullCommandWanted, historyArgs);
+      
+      executeAndWait(historyArgs);
+   }
+
 
 }
 
@@ -117,13 +162,21 @@ int main()
       // Taking the users full line
       fullCommand = readLine();
 
-      // Adding this to command history
-      addToHistory(fullCommand, historyCommands);
+      // Taking a constant version of full line
+      char *constantFullCommand = malloc(1000);
+      strcpy(constantFullCommand, fullCommand); 
 
       // Resetting an args 2d array
       char **userArgs = malloc(1000);
       // Filling the array with users args
       splitToArgs(fullCommand, userArgs);
+
+
+      // Adding this to command history, unless it is the history check command
+      if (strcmp(userArgs[0], "history") != 0 && strcmp(userArgs[0], "h") != 0)
+      {
+         addToHistory(constantFullCommand, historyCommands);
+      }
 
       // If command is cd
       if (strcmp(userArgs[0], "cd") == 0)
