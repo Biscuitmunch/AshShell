@@ -77,6 +77,51 @@ void executeAndWait(char **userArgs)
    }
 }
 
+void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
+{
+   pid_t childID = fork();
+
+   if (childID == 0)
+   {
+      pid_t runnerID = fork();
+
+      if (runnerID == 0)
+      {
+         execvp(userArgs[0], userArgs);
+      }
+
+      else
+      {
+         int processCounter = 1;
+         
+         char *keepCommand = malloc(1000);
+         strcpy(keepCommand, fullCommand);
+
+         while (amperProcesses[processCounter]!=0)
+         {
+            processCounter++;
+         }
+
+         amperProcesses[processCounter] = processCounter;
+
+         printf("\b\b\b\b\b[%d] %d\nash> ", processCounter, getpid());
+         fflush(stdout);
+
+         int errorCode;
+         waitpid(childID, &errorCode, 0);
+
+         printf("\n[%d] <Done> %s", processCounter, keepCommand);
+         exit(0);
+      }
+
+   }
+
+   else
+   {
+      return;
+   }
+}
+
 void historyCommand(char *commandType, char **historyOfUser)
 {
    if (historyOfUser[0]==NULL)
@@ -153,6 +198,24 @@ void addToHistory(char *userString, char **historyOfUser)
    historyAmount++;
 }
 
+int amperCheck(char **userArgs)
+{
+   int count = 0;
+   while (userArgs[count]!=NULL)
+   {
+      count++;
+   }
+   if (strcmp(userArgs[count-1], "&") == 0)
+   {
+      userArgs[count-1] = '\0';
+      return 1;
+   }
+   else
+   {
+      return 0;
+   }
+}
+
 int main()
 {
 
@@ -162,6 +225,9 @@ int main()
    // attaching program run
    char *OGdirectory = malloc(1000);
    getcwd(OGdirectory, 1000);
+
+   // process control
+   int *amperProcesses = malloc(1000);
 
    // History variable
    char **historyCommands = malloc(1000);
@@ -183,6 +249,13 @@ int main()
       // Filling the array with users args
       splitToArgs(fullCommand, userArgs);
 
+      // Checking if ampersand
+      int amperValue = amperCheck(userArgs);
+      printf("Amper value: %d\n", amperValue);
+
+      // Checking pipe locations and if pipe
+      int pipeExists = 0;
+      int *pipeLocations;
 
       // Adding this to command history
       addToHistory(constantFullCommand, historyCommands);
@@ -209,7 +282,23 @@ int main()
       // Run built-in normal commands
       else
       {
-         executeAndWait(userArgs);
+         if (pipeExists == 1 && amperValue == 1)
+         {
+            printf("pipe and amper\n");
+         }
+         else if (pipeExists == 1)
+         {
+            printf("pipe\n");
+         }
+         else if (amperValue == 1)
+         {
+            executeAndDontWait(userArgs, amperProcesses, constantFullCommand);
+         }
+         else
+         {
+            executeAndWait(userArgs);
+         }
+
       }
 
       free(userArgs);
