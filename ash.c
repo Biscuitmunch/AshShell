@@ -4,12 +4,15 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
+ int *amperProcesses, char **historyCommands);
+
 int historyAmount = 0;
 
 char *readLine(void)
 {
    printf("ash> ");
-   char *fullLine = malloc(1000);
+   char *fullLine = malloc(16384);
    int adder = 0;
 
    while (1)
@@ -94,7 +97,7 @@ void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
       {
          int processCounter = 1;
          
-         char *keepCommand = malloc(1000);
+         char *keepCommand = malloc(16384);
          strcpy(keepCommand, fullCommand);
 
          while (amperProcesses[processCounter]!=0)
@@ -110,7 +113,7 @@ void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
          int errorCode;
          waitpid(childID, &errorCode, 0);
 
-         printf("\n[%d] <Done> %s", processCounter, keepCommand);
+         printf("\n[%d] <Done> %s\nash> ", processCounter, keepCommand);
          exit(0);
       }
 
@@ -122,7 +125,7 @@ void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
    }
 }
 
-void historyCommand(char *commandType, char **historyOfUser)
+void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, int *amperProcesses)
 {
    if (historyOfUser[0]==NULL)
    {
@@ -159,12 +162,12 @@ void historyCommand(char *commandType, char **historyOfUser)
    {
       // Getting the history value wanted
       char *extraString;
-      char *historyWanted = malloc(1000);
+      char *historyWanted = malloc(16384);
       strcpy(historyWanted, commandType);
 
       // Converting to int to get the history string
       long histNum = strtol(historyWanted, &extraString, 10);
-      char *fullCommandWanted = malloc(1000);
+      char *fullCommandWanted = malloc(16384);
 
       // if doesnt exist, return
       if (historyOfUser[histNum-1]==NULL)
@@ -176,12 +179,11 @@ void historyCommand(char *commandType, char **historyOfUser)
       strcpy(fullCommandWanted, historyOfUser[histNum-1]);
 
       // Running the history command
-      char **historyArgs = malloc(1000);
+      char **historyArgs = malloc(16384);
       splitToArgs(fullCommandWanted, historyArgs);
       
-      executeAndWait(historyArgs);
+      runCommand(historyArgs, fullCommandWanted, OGdirectory, amperProcesses, historyOfUser);
 
-      free(historyArgs);
    }
 
 
@@ -190,7 +192,7 @@ void historyCommand(char *commandType, char **historyOfUser)
 void addToHistory(char *userString, char **historyOfUser)
 {
 
-   char *temp = malloc(1000);
+   char *temp = malloc(16384);
    strcpy(temp, userString);
 
    historyOfUser[historyAmount] = temp;
@@ -216,21 +218,76 @@ int amperCheck(char **userArgs)
    }
 }
 
-int main()
+void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
+ int *amperProcesses, char **historyCommands)
 {
 
-   // Char where we will store users full command line
-   char *fullCommand = malloc(1000);
+   // Checking if ampersand
+   int amperValue = amperCheck(userArgs);
+   printf("Amper value: %d\n", amperValue);
 
-   // attaching program run
-   char *OGdirectory = malloc(1000);
-   getcwd(OGdirectory, 1000);
+   // Checking pipe locations and if pipe
+   int pipeExists = 0;
+   int *pipeLocations;
 
+   // Adding this to command history
+   addToHistory(constantFullCommand, historyCommands);
+
+   // If command is cd
+   if (strcmp(userArgs[0], "cd") == 0)
+   {
+      if (userArgs[1] == NULL)
+      {
+         cdCommand(OGdirectory);
+      }
+      else
+      {
+         cdCommand(userArgs[1]);
+      }
+   }
+
+   // If command is history
+   else if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
+   {
+      historyCommand(userArgs[1], historyCommands, OGdirectory, amperProcesses);
+   }
+
+   // Run built-in normal commands
+   else
+   {
+      if (pipeExists == 1 && amperValue == 1)
+      {
+         printf("pipe and amper\n");
+      }
+      else if (pipeExists == 1)
+      {
+         printf("pipe\n");
+      }
+      else if (amperValue == 1)
+      {
+         executeAndDontWait(userArgs, amperProcesses, constantFullCommand);
+      }
+      else
+      {
+         executeAndWait(userArgs);
+      }
+   }
+}
+
+int main()
+{
    // process control
-   int *amperProcesses = malloc(1000);
+   int *amperProcesses = malloc(16384);
 
    // History variable
-   char **historyCommands = malloc(1000);
+   char **historyCommands = malloc(16384);
+
+   // Char where we will store users full command line
+   char *fullCommand = malloc(16384);
+
+   // attaching program run
+   char *OGdirectory = malloc(16384);
+   getcwd(OGdirectory, 1000);
 
    while (strcmp(fullCommand, "exit") != 0)
    {
@@ -241,65 +298,15 @@ int main()
       fullCommand = readLine();
 
       // Taking a constant version of full line
-      char *constantFullCommand = malloc(1000);
+      char *constantFullCommand = malloc(16384);
       strcpy(constantFullCommand, fullCommand); 
 
       // Resetting an args 2d array
-      char **userArgs = malloc(1000);
+      char **userArgs = malloc(16384);
       // Filling the array with users args
       splitToArgs(fullCommand, userArgs);
 
-      // Checking if ampersand
-      int amperValue = amperCheck(userArgs);
-      printf("Amper value: %d\n", amperValue);
-
-      // Checking pipe locations and if pipe
-      int pipeExists = 0;
-      int *pipeLocations;
-
-      // Adding this to command history
-      addToHistory(constantFullCommand, historyCommands);
-
-      // If command is cd
-      if (strcmp(userArgs[0], "cd") == 0)
-      {
-         if (userArgs[1] == NULL)
-         {
-            cdCommand(OGdirectory);
-         }
-         else
-         {
-            cdCommand(userArgs[1]);
-         }
-      }
-
-      // If command is history
-      else if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
-      {
-         historyCommand(userArgs[1], historyCommands);
-      }
-
-      // Run built-in normal commands
-      else
-      {
-         if (pipeExists == 1 && amperValue == 1)
-         {
-            printf("pipe and amper\n");
-         }
-         else if (pipeExists == 1)
-         {
-            printf("pipe\n");
-         }
-         else if (amperValue == 1)
-         {
-            executeAndDontWait(userArgs, amperProcesses, constantFullCommand);
-         }
-         else
-         {
-            executeAndWait(userArgs);
-         }
-
-      }
+      runCommand(userArgs, constantFullCommand, OGdirectory, amperProcesses, historyCommands);
 
       free(userArgs);
 
