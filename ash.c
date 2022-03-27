@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
+int historyAmount = 0;
+
 char *readLine(void)
 {
    printf("ash> ");
@@ -83,9 +85,21 @@ void historyCommand(char *commandType, char **historyOfUser)
       return;
    }
    
-   if (commandType==NULL)
+   if (commandType==NULL && historyAmount < 11)
    {
-      for (int i = 1; i <= 10; i++)
+      for (int i = 1; i <= historyAmount; i++)
+      {
+         printf("%d: %s\n", i, historyOfUser[i-1]);
+
+         if (historyOfUser[i]==NULL)
+         {
+            break;
+         }
+      }
+   }
+   else if (commandType==NULL)
+   {
+      for (int i = historyAmount-9; i <= historyAmount; i++)
       {
          printf("%d: %s\n", i, historyOfUser[i-1]);
 
@@ -121,6 +135,8 @@ void historyCommand(char *commandType, char **historyOfUser)
       splitToArgs(fullCommandWanted, historyArgs);
       
       executeAndWait(historyArgs);
+
+      free(historyArgs);
    }
 
 
@@ -129,16 +145,12 @@ void historyCommand(char *commandType, char **historyOfUser)
 void addToHistory(char *userString, char **historyOfUser)
 {
 
-   for (int i = 9; i > 0; i--)
-   {
-      historyOfUser[i] = historyOfUser[i-1];
-   }
-
    char *temp = malloc(1000);
    strcpy(temp, userString);
 
-   historyOfUser[0] = temp;
+   historyOfUser[historyAmount] = temp;
 
+   historyAmount++;
 }
 
 int main()
@@ -172,11 +184,8 @@ int main()
       splitToArgs(fullCommand, userArgs);
 
 
-      // Adding this to command history, unless it is the history check command
-      if (strcmp(userArgs[0], "history") != 0 && strcmp(userArgs[0], "h") != 0)
-      {
-         addToHistory(constantFullCommand, historyCommands);
-      }
+      // Adding this to command history
+      addToHistory(constantFullCommand, historyCommands);
 
       // If command is cd
       if (strcmp(userArgs[0], "cd") == 0)
