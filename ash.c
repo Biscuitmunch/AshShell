@@ -237,9 +237,18 @@ int pipeCheck(char **userArgs)
 
 void executeWithPipes(char ***userArgs, int amper, int pipeNum)
 {
-   pipeNum = 1;
    pid_t child1, child2;
    int fildes[2];
+
+   pipeNum--;
+
+   if (pipeNum == 0)
+   {
+      execvp(userArgs[pipeNum][0], userArgs[pipeNum]);
+      exit(0);
+   }
+   //pipeNum = 1;
+
    pipe(fildes);
    child1 = fork();
    if (child1 == 0)
@@ -251,40 +260,45 @@ void executeWithPipes(char ***userArgs, int amper, int pipeNum)
       close(fildes[0]);
       close(fildes[1]);
 
-      //executeWithPipes(userArgs, amper, pipeNum);
+      executeWithPipes(userArgs, amper, pipeNum);
 
-      execvp(userArgs[pipeNum-1][0], userArgs[pipeNum-1]);
-      exit(0);
    }
    else
    {
 
       int errorMsg;
+      dup2(fildes[0], STDIN_FILENO);
+      close(fildes[0]);
+      close(fildes[1]);
       waitpid(child1, &errorMsg, 0);
+
+      execvp(userArgs[pipeNum][0], userArgs[pipeNum]);
+      exit(0);
+      
       // Creating a second child under the same parent
-      child2 = fork();
+      // child2 = fork();
 
-      if (child2 == 0)
-      {
-         dup2(fildes[0], STDIN_FILENO);
-         close(fildes[0]);
-         close(fildes[1]);
-         // printf("hello2\n");
-         // printf("%s\n", userArgs[pipeNum][0]);
-         // printf("%s\n", userArgs[pipeNum][1]);
-         execvp(userArgs[pipeNum][0], userArgs[pipeNum]);
-         // printf("hello2v2\n");
-         exit(0);
-      }
-      else
-      {
-         // printf("hello3\n");
+      // if (child2 == 0)
+      // {
+      //    dup2(fildes[0], STDIN_FILENO);
+      //    close(fildes[0]);
+      //    close(fildes[1]);
+      //    // printf("hello2\n");
+      //    // printf("%s\n", userArgs[pipeNum][0]);
+      //    // printf("%s\n", userArgs[pipeNum][1]);
+      //    execvp(userArgs[pipeNum][0], userArgs[pipeNum]);
+      //    // printf("hello2v2\n");
+      //    exit(0);
+      // }
+      // else
+      // {
+      //    // printf("hello3\n");
 
-         close(fildes[0]);
-         close(fildes[1]);
-         int errorMsg;
-         waitpid(child2, &errorMsg, 0);
-      }
+      //    close(fildes[0]);
+      //    close(fildes[1]);
+      //    int errorMsg;
+      //    waitpid(child2, &errorMsg, 0);
+      // }
 
    }
 
@@ -342,7 +356,23 @@ char ***createPipeArgInput(char **userArgs, int amper)
    pipedArgs[count][i] = NULL;
 
    int numOfPipes = 0;
-   executeWithPipes(pipedArgs, amper, maxPipes);
+
+
+   
+   pid_t runningPipeCommand = fork();
+
+   if (runningPipeCommand == 0)
+   {
+      executeWithPipes(pipedArgs, amper, maxPipes + 1);
+   }
+   else
+   {
+      if (amper == 0)
+      {
+         int errorMsg;
+         waitpid(runningPipeCommand, &errorMsg, 0);
+      }
+   }
 
 }
 
