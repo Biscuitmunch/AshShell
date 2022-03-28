@@ -28,6 +28,7 @@ char *readLine(void)
 
          if (fullLine[0] == '\0')
          {
+            exit(0);
             printf("ash> ");
             continue;
          }
