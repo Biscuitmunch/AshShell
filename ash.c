@@ -12,7 +12,7 @@ int historyAmount = 0;
 char *readLine(void)
 {
    printf("ash> ");
-   char *fullLine = malloc(16384);
+   char *fullLine = calloc(16384, 1);
    int adder = 0;
 
    while (1)
@@ -97,7 +97,7 @@ void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
       {
          int processCounter = 1;
          
-         char *keepCommand = malloc(16384);
+         char *keepCommand = calloc(16384, 1);
          strcpy(keepCommand, fullCommand);
 
          while (amperProcesses[processCounter]!=0)
@@ -162,12 +162,12 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
    {
       // Getting the history value wanted
       char *extraString;
-      char *historyWanted = malloc(16384);
+      char *historyWanted = calloc(16384, 1);
       strcpy(historyWanted, commandType);
 
       // Converting to int to get the history string
       long histNum = strtol(historyWanted, &extraString, 10);
-      char *fullCommandWanted = malloc(16384);
+      char *fullCommandWanted = calloc(16384, 1);
 
       // if doesnt exist, return
       if (historyOfUser[histNum-1]==NULL)
@@ -179,7 +179,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
       strcpy(fullCommandWanted, historyOfUser[histNum-1]);
 
       // Running the history command
-      char **historyArgs = malloc(16384);
+      char **historyArgs = calloc(16384, 1);
       splitToArgs(fullCommandWanted, historyArgs);
       
       runCommand(historyArgs, fullCommandWanted, OGdirectory, amperProcesses, historyOfUser);
@@ -192,7 +192,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
 void addToHistory(char *userString, char **historyOfUser)
 {
 
-   char *temp = malloc(16384);
+   char *temp = calloc(16384, 1);
    strcpy(temp, userString);
 
    historyOfUser[historyAmount] = temp;
@@ -218,17 +218,144 @@ int amperCheck(char **userArgs)
    }
 }
 
+int pipeCheck(char **userArgs)
+{
+   int count = 1;
+   while (userArgs[count]!=NULL)
+   {
+      if (strcmp(userArgs[count-1], "|") == 0)
+      {
+         return 1;
+      }
+      count++;
+   }
+
+   return 0;
+
+}
+
+
+void executeWithPipes(char ***userArgs, int amper, int pipeNum)
+{
+   pipeNum = 1;
+   pid_t child1, child2;
+   int fildes[2];
+   pipe(fildes);
+   child1 = fork();
+   if (child1 == 0)
+   {
+      // printf("hello1v2\n");
+      // printf("%s\n", userArgs[pipeNum-1][0]);
+      // printf("%s\n", userArgs[pipeNum-1][1]);
+      dup2(fildes[1], STDOUT_FILENO);
+      close(fildes[0]);
+      close(fildes[1]);
+
+      //executeWithPipes(userArgs, amper, pipeNum);
+
+      execvp(userArgs[pipeNum-1][0], userArgs[pipeNum-1]);
+      exit(0);
+   }
+   else
+   {
+
+      int errorMsg;
+      waitpid(child1, &errorMsg, 0);
+      // Creating a second child under the same parent
+      child2 = fork();
+
+      if (child2 == 0)
+      {
+         dup2(fildes[0], STDIN_FILENO);
+         close(fildes[0]);
+         close(fildes[1]);
+         // printf("hello2\n");
+         // printf("%s\n", userArgs[pipeNum][0]);
+         // printf("%s\n", userArgs[pipeNum][1]);
+         execvp(userArgs[pipeNum][0], userArgs[pipeNum]);
+         // printf("hello2v2\n");
+         exit(0);
+      }
+      else
+      {
+         // printf("hello3\n");
+
+         close(fildes[0]);
+         close(fildes[1]);
+         int errorMsg;
+         waitpid(child2, &errorMsg, 0);
+      }
+
+   }
+
+
+
+}
+
+char ***createPipeArgInput(char **userArgs, int amper)
+{
+   int buffsize1 = 10;
+   int buffsize2 = 10;
+   char ***pipedArgs = malloc(buffsize1*sizeof(char **));
+   *pipedArgs = malloc(buffsize2*sizeof(char *));
+   int count = 0;
+   int i = 0;
+   int j = 0;
+   int maxPipes = 0;
+   while (userArgs[j] != NULL)
+   {
+      // printf("%s\n", userArgs[j]);
+
+      if (strcmp(userArgs[j], "|") == 0)
+      {
+         // printf("found a pipe");
+         i++;
+         pipedArgs[count][i] = NULL;
+         maxPipes++;
+         j++;
+         count++;
+         if (count >= buffsize1)
+         {
+            buffsize1 += buffsize1;
+            pipedArgs = realloc(pipedArgs, buffsize1*sizeof(char **));
+         }
+         i = 0;
+         buffsize2 = 10;
+         pipedArgs[count] = malloc(buffsize2*sizeof(char*));
+         continue;
+
+      }
+      
+      // printf("adding %s at %d to %d", userArgs[j], i, count);
+      pipedArgs[count][i] = malloc(sizeof(char)*strlen(userArgs[j]));
+      strcpy(pipedArgs[count][i], userArgs[j]);
+      j++;
+      i++;
+      if (i >= buffsize2)
+      {
+         buffsize2 += buffsize2;
+         pipedArgs[count] = realloc(pipedArgs[count], buffsize2*sizeof(char *));
+      }
+
+   }
+
+   pipedArgs[count][i] = NULL;
+
+   int numOfPipes = 0;
+   executeWithPipes(pipedArgs, amper, maxPipes);
+
+}
+
 void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
  int *amperProcesses, char **historyCommands)
 {
 
    // Checking if ampersand
    int amperValue = amperCheck(userArgs);
-   printf("Amper value: %d\n", amperValue);
+   // printf("Amper value: %d\n", amperValue);
 
    // Checking pipe locations and if pipe
-   int pipeExists = 0;
-   int *pipeLocations;
+   int pipeExists = pipeCheck(userArgs);
 
    // Adding this to command history
    addToHistory(constantFullCommand, historyCommands);
@@ -255,13 +382,9 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    // Run built-in normal commands
    else
    {
-      if (pipeExists == 1 && amperValue == 1)
+      if (pipeExists == 1)
       {
-         printf("pipe and amper\n");
-      }
-      else if (pipeExists == 1)
-      {
-         printf("pipe\n");
+         createPipeArgInput(userArgs, amperValue);
       }
       else if (amperValue == 1)
       {
@@ -277,16 +400,16 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
 int main()
 {
    // process control
-   int *amperProcesses = malloc(16384);
+   int *amperProcesses = calloc(16384, 1);
 
    // History variable
-   char **historyCommands = malloc(16384);
+   char **historyCommands = calloc(16384, 1);
 
    // Char where we will store users full command line
-   char *fullCommand = malloc(16384);
+   char *fullCommand = calloc(16384, 1);
 
    // attaching program run
-   char *OGdirectory = malloc(16384);
+   char *OGdirectory = calloc(16384, 1);
    getcwd(OGdirectory, 1000);
 
    while (strcmp(fullCommand, "exit") != 0)
@@ -298,11 +421,11 @@ int main()
       fullCommand = readLine();
 
       // Taking a constant version of full line
-      char *constantFullCommand = malloc(16384);
+      char *constantFullCommand = calloc(16384, 1);
       strcpy(constantFullCommand, fullCommand); 
 
       // Resetting an args 2d array
-      char **userArgs = malloc(16384);
+      char **userArgs = calloc(16384, 1);
       // Filling the array with users args
       splitToArgs(fullCommand, userArgs);
 
