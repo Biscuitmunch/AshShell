@@ -121,30 +121,7 @@ void executeAndDontWait(char **userArgs, char *fullCommand, char **jobCommandsAm
    {
       execvp(userArgs[0], userArgs);
       exit(0);
-
-      // int processCounter = 1;
-
-      // char *keepCommand = calloc(16384, 1);
-      // strcpy(keepCommand, fullCommand);
-
-      // while (amperProcesses[processCounter]!=0)
-      // {
-      //    processCounter++;
-      // }
-
-      // amperProcesses[processCounter] = processCounter;
-
-      // printf("\b\b\b\b\b[%d] %d\nash> ", processCounter, getpid());
-      // fflush(stdout);
-
-      // int errorCode;
-      // waitpid(childID, &errorCode, 0);
-
-      // printf("\n[%d] <Done> %s\nash> ", processCounter, keepCommand);
-      // exit(0);
-      //}
    }
-
    else
    {
       return;
@@ -412,13 +389,69 @@ char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand
    executeWithPipes(pipedArgs, amper, maxPipes, constantFullCommand, jobCommandsAmper, jobIDs);
 }
 
-void jobCommand(uid_t *jobIDs, char **jobCommandsAmper)
+char fileRead(pid_t jobToCheck)
 {
+   FILE *statusFile;
+   char fileName[1000];
+   sprintf(fileName, "/proc/%d/stat", jobToCheck);
+
+   statusFile = fopen(fileName, "r");
+
+   char status;
+   fscanf(statusFile, "%*s %*[^)]) %c", &status);
+
+   fclose(statusFile);
+
+   return status;
+}
+
+char *whichState(char stateChar)
+{
+   char *jobStatus = calloc(16384, 1);
+
+   switch(stateChar)
+   {
+      case 'S':
+      case 'D':
+         jobStatus = "Sleeping";
+         break;
+
+      case 'R':
+         jobStatus = "Runnable";
+         break;
+
+      case 'T':
+      case 't':
+         jobStatus = "Stopped";
+         break;
+
+      case 'I':
+         jobStatus = "Idle";
+         break;
+
+      case 'Z':
+         jobStatus = "Zombie";
+         break;
+
+      default:
+         jobStatus = "Unknown";
+         break;
+   }
+
+   return jobStatus;
+}
+
+void jobCommand(pid_t *jobIDs, char **jobCommandsAmper)
+{
+
    for (int i = 1; i <= processCounter; i++)
    {
       if (jobIDs[i] != 0)
       {
-         printf("[%d] %d %s\n", i, jobIDs[i], jobCommandsAmper[i]);
+         char stateCharacter = fileRead(jobIDs[i]);
+         char *stateOfJob = calloc(1000, 1);
+         stateOfJob = whichState(stateCharacter);
+         printf("[%d] <%s> %s\n", i, stateOfJob, jobCommandsAmper[i]);
       }
    }
 }
