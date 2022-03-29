@@ -412,6 +412,17 @@ char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand
    executeWithPipes(pipedArgs, amper, maxPipes, constantFullCommand, jobCommandsAmper, jobIDs);
 }
 
+void jobCommand(uid_t *jobIDs, char **jobCommandsAmper)
+{
+   for (int i = 1; i <= processCounter; i++)
+   {
+      if (jobIDs[i] != 0)
+      {
+         printf("[%d] %d %s\n", i, jobIDs[i], jobCommandsAmper[i]);
+      }
+   }
+}
+
 void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
                 char **historyCommands, char **jobCommandsAmper, pid_t *jobIDs)
 {
@@ -443,6 +454,12 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    else if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
    {
       historyCommand(userArgs[1], historyCommands, OGdirectory, jobCommandsAmper, jobIDs);
+   }
+
+   // If command is jobs
+   if (strcmp(userArgs[0], "jobs") == 0)
+   {
+      jobCommand(jobIDs, jobCommandsAmper);
    }
 
    // Run built-in normal commands
