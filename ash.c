@@ -354,7 +354,7 @@ void executeWithPipes(char ***userArgs, int amper, int pipeNum, char *constantFu
 
 }
 
-char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand)
+char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand, char **jobCommandsAmper, pid_t *jobIDs)
 {
    int buffsize1 = 10;
    int buffsize2 = 10;
@@ -420,6 +420,31 @@ char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand
          int errorMsg;
          waitpid(runningPipeCommand, &errorMsg, 0);
       }
+      else
+      {
+         if (jobsRunning == 0)
+         {
+            processCounter = 1;
+            jobsRunning++;
+            jobCommandsAmper[processCounter] = strdup(constantFullCommand);
+            jobIDs[processCounter] = runningPipeCommand;
+            printf("[%d] %d\n", processCounter, runningPipeCommand);
+         }
+         else
+         {
+            jobsRunning++;
+            processCounter++;
+            int countdown = processCounter;
+            while (jobIDs[countdown] == '\0')
+            {
+               countdown--;
+            }
+            countdown++;
+            jobCommandsAmper[countdown] = strdup(constantFullCommand);
+            jobIDs[countdown] = runningPipeCommand;
+            printf("[%d] %d\n", processCounter, runningPipeCommand);
+         }
+      }
    }
 
 }
@@ -462,7 +487,7 @@ char **historyCommands, char **jobCommandsAmper, pid_t *jobIDs)
    {
       if (pipeExists == 1)
       {
-         createPipeArgInput(userArgs, amperValue, constantFullCommand);
+         createPipeArgInput(userArgs, amperValue, constantFullCommand, jobCommandsAmper, jobIDs);
       }
       else if (amperValue == 1)
       {
