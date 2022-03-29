@@ -12,7 +12,12 @@ int jobsRunning = 0;
 
 char *readLine(void)
 {
-   printf("ash> ");
+   // If running from a terminal, show ash before typing
+   if (isatty(STDIN_FILENO))
+   {
+      printf("ash> ");
+   }
+   
    char *fullLine = calloc(16384, 1);
    int adder = 0;
 
@@ -31,6 +36,16 @@ char *readLine(void)
             exit(0);
             printf("ash> ");
             continue;
+         }
+
+         if (isatty(STDIN_FILENO))
+         {
+            // Code if terminal
+         }
+         // If running from a file, show ash> "command" after it's entered
+         else
+         {
+            printf("ash> %s\n", fullLine);
          }
 
          return fullLine;
