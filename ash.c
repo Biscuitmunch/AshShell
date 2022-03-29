@@ -215,6 +215,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
 void addToHistory(char *userString, char **historyOfUser)
 {
 
+
    char *temp = calloc(16384, 1);
    strcpy(temp, userString);
 
@@ -483,7 +484,14 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    int pipeExists = pipeCheck(userArgs);
 
    // Adding this to command history
-   addToHistory(constantFullCommand, historyCommands);
+   if (strcmp(userArgs[0], "history") == 0 && userArgs[1] != NULL || strcmp(userArgs[0], "h") == 0 && userArgs[1] != NULL)
+   {
+      // We do not add "h #" commands to history
+   }
+   else
+   {
+      addToHistory(constantFullCommand, historyCommands);
+   }
 
    // If command is cd
    if (strcmp(userArgs[0], "cd") == 0)
