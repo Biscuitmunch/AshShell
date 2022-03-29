@@ -4,10 +4,11 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
- int *amperProcesses, char **historyCommands);
+void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory, char **historyCommands, char **jobsCommandAmper, pid_t *jobIDs);
 
 int historyAmount = 0;
+int processCounter = 1;
+int jobsRunning = 0;
 
 char *readLine(void)
 {
@@ -81,42 +82,63 @@ void executeAndWait(char **userArgs)
    }
 }
 
-void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
+void executeAndDontWait(char **userArgs, char *fullCommand, char **jobCommandsAmper, pid_t *jobIDs)
 {
+
    pid_t childID = fork();
+
+   if (childID != 0)
+   {
+      if (jobsRunning == 0)
+      {
+         processCounter = 1;
+         jobsRunning++;
+         jobCommandsAmper[processCounter] = strdup(fullCommand);
+         jobIDs[processCounter] = childID;
+         printf("[%d] %d\n", processCounter, childID);
+      }
+      else
+      {
+         jobsRunning++;
+         processCounter++;
+         int countdown = processCounter;
+         while (jobIDs[countdown] == '\0')
+         {
+            countdown--;
+         }
+         countdown++;
+         jobCommandsAmper[countdown] = strdup(fullCommand);
+         jobIDs[countdown] = childID;
+         printf("[%d] %d\n", processCounter, childID);
+      }
+   }
 
    if (childID == 0)
    {
-      pid_t runnerID = fork();
+      execvp(userArgs[0], userArgs);
+      exit(0);
 
-      if (runnerID == 0)
-      {
-         execvp(userArgs[0], userArgs);
-      }
-
-      else
-      {
-         int processCounter = 1;
+         // int processCounter = 1;
          
-         char *keepCommand = calloc(16384, 1);
-         strcpy(keepCommand, fullCommand);
+         // char *keepCommand = calloc(16384, 1);
+         // strcpy(keepCommand, fullCommand);
 
-         while (amperProcesses[processCounter]!=0)
-         {
-            processCounter++;
-         }
+         // while (amperProcesses[processCounter]!=0)
+         // {
+         //    processCounter++;
+         // }
 
-         amperProcesses[processCounter] = processCounter;
+         // amperProcesses[processCounter] = processCounter;
 
-         printf("\b\b\b\b\b[%d] %d\nash> ", processCounter, getpid());
-         fflush(stdout);
+         // printf("\b\b\b\b\b[%d] %d\nash> ", processCounter, getpid());
+         // fflush(stdout);
 
-         int errorCode;
-         waitpid(childID, &errorCode, 0);
+         // int errorCode;
+         // waitpid(childID, &errorCode, 0);
 
-         printf("\n[%d] <Done> %s\nash> ", processCounter, keepCommand);
-         exit(0);
-      }
+         // printf("\n[%d] <Done> %s\nash> ", processCounter, keepCommand);
+         // exit(0);
+      //}
 
    }
 
@@ -126,7 +148,32 @@ void executeAndDontWait(char **userArgs, int *amperProcesses, char *fullCommand)
    }
 }
 
-void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, int *amperProcesses)
+void jobStates(pid_t *jobIDs, char **jobCommandsAmper)
+{
+
+   for (int i = 0; i <= processCounter; i++)
+   {
+      if (jobIDs[i]==0)
+      {
+         continue;
+      }
+      else
+      {
+         int state;
+         pid_t statusID = waitpid(jobIDs[i], &state, WNOHANG);
+         if (statusID == jobIDs[i])
+         {
+            printf("[%d] <Done> %s\n", i, jobCommandsAmper[i]);
+            jobsRunning--;
+            jobIDs[i] = 0;
+         }
+
+
+      }
+   }
+}
+
+void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, char **jobsCommandAmper, pid_t *jobIDs)
 {
    if (historyOfUser[0]==NULL)
    {
@@ -138,7 +185,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
    {
       for (int i = 1; i <= historyAmount; i++)
       {
-         printf("%d: %s\n", i, historyOfUser[i-1]);
+         printf("%3d: %s\n", i, historyOfUser[i-1]);
 
          if (historyOfUser[i]==NULL)
          {
@@ -150,7 +197,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
    {
       for (int i = historyAmount-9; i <= historyAmount; i++)
       {
-         printf("%d: %s\n", i, historyOfUser[i-1]);
+         printf("%3d: %s\n", i, historyOfUser[i-1]);
 
          if (historyOfUser[i]==NULL)
          {
@@ -183,7 +230,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
       char **historyArgs = calloc(16384, 1);
       splitToArgs(fullCommandWanted, historyArgs);
       
-      runCommand(historyArgs, fullCommandWanted, OGdirectory, amperProcesses, historyOfUser);
+      runCommand(historyArgs, fullCommandWanted, OGdirectory, historyOfUser, jobsCommandAmper, jobIDs);
 
    }
 
@@ -236,7 +283,7 @@ int pipeCheck(char **userArgs)
 }
 
 
-void executeWithPipes(char ***userArgs, int amper, int pipeNum)
+void executeWithPipes(char ***userArgs, int amper, int pipeNum, char *constantFullCommand)
 {
    pid_t child1, child2;
    int fildes[2];
@@ -261,7 +308,7 @@ void executeWithPipes(char ***userArgs, int amper, int pipeNum)
       close(fildes[0]);
       close(fildes[1]);
 
-      executeWithPipes(userArgs, amper, pipeNum);
+      executeWithPipes(userArgs, amper, pipeNum, constantFullCommand);
 
    }
    else
@@ -307,7 +354,7 @@ void executeWithPipes(char ***userArgs, int amper, int pipeNum)
 
 }
 
-char ***createPipeArgInput(char **userArgs, int amper)
+char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand)
 {
    int buffsize1 = 10;
    int buffsize2 = 10;
@@ -364,7 +411,7 @@ char ***createPipeArgInput(char **userArgs, int amper)
 
    if (runningPipeCommand == 0)
    {
-      executeWithPipes(pipedArgs, amper, maxPipes + 1);
+      executeWithPipes(pipedArgs, amper, maxPipes + 1, constantFullCommand);
    }
    else
    {
@@ -377,8 +424,8 @@ char ***createPipeArgInput(char **userArgs, int amper)
 
 }
 
-void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
- int *amperProcesses, char **historyCommands)
+void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory, 
+char **historyCommands, char **jobCommandsAmper, pid_t *jobIDs)
 {
 
    // Checking if ampersand
@@ -407,7 +454,7 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    // If command is history
    else if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
    {
-      historyCommand(userArgs[1], historyCommands, OGdirectory, amperProcesses);
+      historyCommand(userArgs[1], historyCommands, OGdirectory, jobCommandsAmper, jobIDs);
    }
 
    // Run built-in normal commands
@@ -415,11 +462,11 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    {
       if (pipeExists == 1)
       {
-         createPipeArgInput(userArgs, amperValue);
+         createPipeArgInput(userArgs, amperValue, constantFullCommand);
       }
       else if (amperValue == 1)
       {
-         executeAndDontWait(userArgs, amperProcesses, constantFullCommand);
+         executeAndDontWait(userArgs, constantFullCommand, jobCommandsAmper, jobIDs);
       }
       else
       {
@@ -430,8 +477,10 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
 
 int main()
 {
-   // process control
-   int *amperProcesses = calloc(16384, 1);
+
+   char **jobsCommandAmper = calloc(16384, 1);
+
+   pid_t *jobIDs = calloc(16384, 1);
 
    // History variable
    char **historyCommands = calloc(16384, 1);
@@ -445,6 +494,8 @@ int main()
 
    while (strcmp(fullCommand, "exit") != 0)
    {
+      jobStates(jobIDs, jobsCommandAmper);
+
       // Resetting the users old line
       memset(fullCommand, 0, sizeof(fullCommand));
 
@@ -460,7 +511,7 @@ int main()
       // Filling the array with users args
       splitToArgs(fullCommand, userArgs);
 
-      runCommand(userArgs, constantFullCommand, OGdirectory, amperProcesses, historyCommands);
+      runCommand(userArgs, constantFullCommand, OGdirectory, historyCommands, jobsCommandAmper, jobIDs);
 
       free(userArgs);
 
