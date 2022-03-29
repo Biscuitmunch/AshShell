@@ -398,6 +398,7 @@ char fileRead(pid_t jobToCheck)
    statusFile = fopen(fileName, "r");
 
    char status;
+   // Courtesy Chris Dodd at https://stackoverflow.com/a/25883231
    fscanf(statusFile, "%*s %*[^)]) %c", &status);
 
    fclose(statusFile);
@@ -412,7 +413,6 @@ char *whichState(char stateChar)
    switch(stateChar)
    {
       case 'S':
-      case 'D':
          jobStatus = "Sleeping";
          break;
 
@@ -421,7 +421,6 @@ char *whichState(char stateChar)
          break;
 
       case 'T':
-      case 't':
          jobStatus = "Stopped";
          break;
 
@@ -431,6 +430,22 @@ char *whichState(char stateChar)
 
       case 'Z':
          jobStatus = "Zombie";
+         break;
+
+      case 'D':
+         jobStatus = "Disk Sleep";
+         break;
+
+      case 't':
+         jobStatus = "Tracing Stop";
+         break;
+
+      case 'X':
+         jobStatus = "Dead";
+         break;
+
+      case 'P':
+         jobStatus = "Parked";
          break;
 
       default:
@@ -490,7 +505,7 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    }
 
    // If command is jobs
-   if (strcmp(userArgs[0], "jobs") == 0)
+   else if (strcmp(userArgs[0], "jobs") == 0)
    {
       jobCommand(jobIDs, jobCommandsAmper);
    }
