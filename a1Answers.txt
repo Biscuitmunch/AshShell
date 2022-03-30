@@ -25,3 +25,26 @@ we will need separate processes for each one of these own commands executing to 
 This is why pthread_create is lacking for our intended use and cannot be used in the pipeline command situation.
 
 2:
+Using CTRL-Z and fg to get process starting and stopping is done with the help of signals. Using a signal handler with SIGTSTP we can
+create a method which runs when CTRL-Z is input on the keyboard. We can also get fg running like a normal command.
+
+To stop the process, we make sure to keep track of when jobs enter and leave the foreground. This makes it so that we know which 
+job to stop when CTRL-Z is input, and we have to stop whatever foreground process may be running. Once entered, we use a kill command
+on this processes ID, with the option of SIGTSTP. This means that the process has entered a stopped state and has essentially paused
+anything that this state is doing. This is the stopping part of the signal command.
+
+We also use the WUNTRACED option in any "waitpid" commands needed so that the code continues when processes are stopped with CTRL-Z
+
+Once we want to restart the process, the fg command is entered into the terminal. This only works if there is no process already in the 
+foreground, and takes the process that was last used from background or stopped processes. It then moves this process to the foreground
+by using the kill command with the SIGCONT option. This continues the specified process. 
+
+Since this is foreground, we also need to make sure that we are waiting for this specified process that has just continued to actually finish.
+By adding a waitpid alongside where we start this process back in the foreground, we can make sure that we are waiting for it to finish
+before actually being able to run other things. This WAITPID also has WUNTRACED so that when CTRL-Z may be used again we will move
+the process straight back to the "stopped" state.
+
+Simplified, we look for the SIGTSTP signal for CTRL-Z, and stop whichever process is being tracked to be in the foreground at that moment.
+We then look for the fg command and run SIGCONT on the process that we had stopped, and waitpid in order to start it again in foreground.
+
+This dynamic allows us to stop and restart processes using CTRL-Z and fg commands from the user.
