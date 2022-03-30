@@ -34,8 +34,6 @@ char *readLine(void)
          if (fullLine[0] == '\0')
          {
             exit(0);
-            printf("ash> ");
-            continue;
          }
 
          if (isatty(STDIN_FILENO))
@@ -103,7 +101,12 @@ void splitToArgs(char *fullLine, char **userArgs)
 
 void cdCommand(char *userString)
 {
-   chdir(userString);
+   int errCode;
+   errCode = chdir(userString);
+   if (errCode == -1)
+   {
+      printf("cd: %s: No such file or directory\n", userString);
+   }
 }
 
 void executeAndWait(char **userArgs)
@@ -328,6 +331,7 @@ void executeWithPipes(char ***userArgs, int amper, int pipeNum, char *fullComman
 
    int errCode;
    shutOff(pipeNum, fildes);
+   
    if (amper == 0)
    {
       for (int i = 0; i < pipeNum; i++)
@@ -566,7 +570,7 @@ int main()
 
    // attaching program run
    char *OGdirectory = calloc(16384, 1);
-   getcwd(OGdirectory, 1000);
+   getcwd(OGdirectory, 1024);
 
    while (strcmp(fullCommand, "exit") != 0)
    {
