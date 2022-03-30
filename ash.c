@@ -8,12 +8,18 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory, char **historyCommands, char **jobsCommandAmper);
+void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory, char **historyCommands);
+void addToJobs(char *constantFullCommand, pid_t parseID);
 
 int historyAmount = 0;
 int processCounter = 1;
 int jobsRunning = 0;
 pid_t *jobIDs;
+pid_t frontJob = -1;
+pid_t mostRecentJob = -1;
+char *currentCommand;
+char **jobCommandsAmper;
+
 
 char *readLine(void)
 {
@@ -63,13 +69,79 @@ char *readLine(void)
    }
 }
 
-void signalHandler(int signalNumber)
+void deleteJob(long jobNum)
 {
-   signal(SIGTSTP, signalHandler);
-   printf("\ncontrolz was pressed \n");
+   jobsRunning--;
+   jobIDs[jobNum] = 0;
+   if (jobNum == processCounter)
+   {
+      processCounter--;
+   }
 }
 
-void addToJobs(char **jobCommandsAmper, char *constantFullCommand, pid_t parseID)
+void signalHandler(int signalNumber)
+{
+   if (frontJob != -1)
+   {
+      kill(frontJob, SIGTSTP);
+      addToJobs(currentCommand, frontJob);
+      mostRecentJob = frontJob;
+   }
+   else
+   {
+      printf("\nNo foreground job\nash> ");
+      fflush(stdout);
+   }
+
+   signal(SIGTSTP, signalHandler);
+}
+
+void wakeBackground(char *processNumInput)
+{
+   char *words = strdup(processNumInput);
+   char *extraString = calloc(1000, 1);
+
+   long processNum = strtol(words, &extraString, 10);
+
+   if (processNum == 0)
+   {
+      kill(mostRecentJob, SIGCONT);
+   }
+   else
+   {
+      kill(jobIDs[processNum], SIGCONT);
+   }
+
+}
+
+void wakeForeground(char *processNumInput)
+{
+   char *words = strdup(processNumInput);
+   char *extraString = calloc(1000, 1);
+   long processNum = strtol(words, &extraString, 10);
+
+   if (processNum == 0)
+   {
+      currentCommand = jobCommandsAmper[processCounter];
+      kill(mostRecentJob, SIGCONT);
+      frontJob = mostRecentJob;
+      deleteJob(processCounter);
+   }
+   else
+   {
+      currentCommand = jobCommandsAmper[processNum];
+      kill(jobIDs[processNum], SIGCONT);
+      frontJob = jobIDs[processNum];
+      deleteJob(processNum);
+   }
+
+   int errorCode;
+   waitpid(frontJob, &errorCode, WUNTRACED);
+   frontJob = -1;
+
+}
+
+void addToJobs(char *constantFullCommand, pid_t parseID)
 {
    if (jobsRunning == 0)
    {
@@ -122,9 +194,9 @@ void cdCommand(char *userString)
 
 void executeAndWait(char **userArgs)
 {
-   pid_t childID = fork();
+   frontJob = fork();
 
-   if (childID == 0)
+   if (frontJob == 0)
    {
       execvp(userArgs[0], userArgs);
    }
@@ -132,18 +204,19 @@ void executeAndWait(char **userArgs)
    else
    {
       int errorCode;
-      waitpid(childID, &errorCode, 0);
+      waitpid(frontJob, &errorCode, WUNTRACED);
+      frontJob = -1;
    }
 }
 
-void executeAndDontWait(char **userArgs, char *fullCommand, char **jobCommandsAmper)
+void executeAndDontWait(char **userArgs, char *fullCommand)
 {
 
    pid_t childID = fork();
 
    if (childID != 0)
    {
-      addToJobs(jobCommandsAmper, fullCommand, childID);
+      addToJobs(fullCommand, childID);
    }
 
    if (childID == 0)
@@ -157,11 +230,12 @@ void executeAndDontWait(char **userArgs, char *fullCommand, char **jobCommandsAm
    }
 }
 
-void jobStates(char **jobCommandsAmper)
+void jobStates()
 {
 
    for (int i = 0; i <= processCounter; i++)
    {
+
       if (jobIDs[i] == 0)
       {
          continue;
@@ -178,9 +252,23 @@ void jobStates(char **jobCommandsAmper)
          }
       }
    }
+
+   for (int i = processCounter; i > 0; i--)
+   {
+      if (jobIDs[i] == 0)
+      {
+         processCounter--;
+      }
+      else
+      {
+         break;
+      }
+   }
+
+
 }
 
-void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, char **jobsCommandAmper)
+void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory)
 {
    if (historyOfUser[0] == NULL)
    {
@@ -237,7 +325,7 @@ void historyCommand(char *commandType, char **historyOfUser, char *OGdirectory, 
       char **historyArgs = calloc(16384, 1);
       splitToArgs(fullCommandWanted, historyArgs);
 
-      runCommand(historyArgs, fullCommandWanted, OGdirectory, historyOfUser, jobsCommandAmper);
+      runCommand(historyArgs, fullCommandWanted, OGdirectory, historyOfUser);
    }
 }
 
@@ -295,7 +383,7 @@ void shutOff(int pipeNum, int fildes[pipeNum][2])
    }
 }
 
-void executeWithPipes(char ***userArgs, int amper, int pipeNum, char *fullCommand, char **jobCommandsAmper)
+void executeWithPipes(char ***userArgs, int amper, int pipeNum, char *fullCommand)
 {
    pid_t *allChildren = calloc(16384, 1);
 
@@ -365,12 +453,12 @@ void executeWithPipes(char ***userArgs, int amper, int pipeNum, char *fullComman
 
       else
       {
-         addToJobs(jobCommandsAmper, fullCommand, amperFork);
+         addToJobs(fullCommand, amperFork);
       }
    }
 }
 
-char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand, char **jobCommandsAmper)
+char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand)
 {
    int buffsize1 = 10;
    int buffsize2 = 10;
@@ -417,7 +505,7 @@ char ***createPipeArgInput(char **userArgs, int amper, char *constantFullCommand
 
    pipedArgs[count][i] = NULL;
 
-   executeWithPipes(pipedArgs, amper, maxPipes, constantFullCommand, jobCommandsAmper);
+   executeWithPipes(pipedArgs, amper, maxPipes, constantFullCommand);
 }
 
 char fileRead(pid_t jobToCheck)
@@ -487,7 +575,7 @@ char *whichState(char stateChar)
    return jobStatus;
 }
 
-void jobCommand(char **jobCommandsAmper)
+void jobCommand()
 {
 
    for (int i = 1; i <= processCounter; i++)
@@ -503,7 +591,7 @@ void jobCommand(char **jobCommandsAmper)
 }
 
 void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
-                char **historyCommands, char **jobCommandsAmper)
+                char **historyCommands)
 {
 
    // Checking if ampersand
@@ -539,13 +627,38 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    // If command is history
    else if (strcmp(userArgs[0], "history") == 0 || strcmp(userArgs[0], "h") == 0)
    {
-      historyCommand(userArgs[1], historyCommands, OGdirectory, jobCommandsAmper);
+      historyCommand(userArgs[1], historyCommands, OGdirectory);
    }
 
    // If command is jobs
    else if (strcmp(userArgs[0], "jobs") == 0)
    {
-      jobCommand(jobCommandsAmper);
+      jobCommand();
+   }
+
+   else if (strcmp(userArgs[0], "bg") == 0)
+   {
+      if (userArgs[1] == NULL)
+      {
+         wakeBackground("0");
+      }
+      else
+      {
+         wakeBackground(userArgs[1]);
+      }
+   }
+
+   else if (strcmp(userArgs[0], "fg") == 0)
+   {
+      if (userArgs[1] == NULL)
+      {
+         wakeForeground("0");
+      }
+      else
+      {
+         wakeForeground(userArgs[1]);
+      }
+
    }
 
    // Run built-in normal commands
@@ -553,11 +666,11 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
    {
       if (pipeExists == 1)
       {
-         createPipeArgInput(userArgs, amperValue, constantFullCommand, jobCommandsAmper);
+         createPipeArgInput(userArgs, amperValue, constantFullCommand);
       }
       else if (amperValue == 1)
       {
-         executeAndDontWait(userArgs, constantFullCommand, jobCommandsAmper);
+         executeAndDontWait(userArgs, constantFullCommand);
       }
       else
       {
@@ -571,7 +684,9 @@ int main()
 
    signal(SIGTSTP, signalHandler);
 
-   char **jobsCommandAmper = calloc(16384, 1);
+   jobCommandsAmper = calloc(16384, 1);
+
+   currentCommand = calloc(16384, 1);
 
    jobIDs = calloc(16384, 1);
 
@@ -587,7 +702,7 @@ int main()
 
    while (strcmp(fullCommand, "exit") != 0)
    {
-      jobStates(jobsCommandAmper);
+      jobStates();
 
       // Resetting the users old line
       memset(fullCommand, 0, sizeof(fullCommand));
@@ -598,13 +713,14 @@ int main()
       // Taking a constant version of full line
       char *constantFullCommand = calloc(16384, 1);
       strcpy(constantFullCommand, fullCommand);
+      currentCommand = constantFullCommand;
 
       // Resetting an args 2d array
       char **userArgs = calloc(16384, 1);
       // Filling the array with users args
       splitToArgs(fullCommand, userArgs);
 
-      runCommand(userArgs, constantFullCommand, OGdirectory, historyCommands, jobsCommandAmper);
+      runCommand(userArgs, constantFullCommand, OGdirectory, historyCommands);
 
       free(userArgs);
    }
