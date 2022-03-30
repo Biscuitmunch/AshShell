@@ -19,6 +19,7 @@ pid_t frontJob = -1;
 pid_t mostRecentJob = -1;
 char *currentCommand;
 char **jobCommandsAmper;
+void jobStates();
 
 
 char *readLine(void)
@@ -138,6 +139,25 @@ void wakeForeground(char *processNumInput)
    int errorCode;
    waitpid(frontJob, &errorCode, WUNTRACED);
    frontJob = -1;
+
+}
+
+void killCertainProcess(char *processNumInput)
+{
+   char *words = strdup(processNumInput);
+   char *extraString = calloc(1000, 1);
+   long processNum = strtol(words, &extraString, 10);
+
+   if (processNum == 0)
+   {
+      kill(mostRecentJob, SIGKILL);
+      deleteJob(processCounter);
+   }
+   else
+   {
+      kill(jobIDs[processNum], SIGKILL);
+      deleteJob(processNum);
+   }
 
 }
 
@@ -657,6 +677,19 @@ void runCommand(char **userArgs, char *constantFullCommand, char *OGdirectory,
       else
       {
          wakeForeground(userArgs[1]);
+      }
+
+   }
+
+   else if (strcmp(userArgs[0], "kill") == 0)
+   {
+      if (userArgs[1] == NULL)
+      {
+         killCertainProcess("0");
+      }
+      else
+      {
+         killCertainProcess(userArgs[1]);
       }
 
    }
