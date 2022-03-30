@@ -1,3 +1,6 @@
+Skylar Wells
+jwel929
+
 1:
 A fork creates a different process, without shared memory while a thread is a set of instructions running in one process with shared memory,
 you can have many threads but they will all still be running in the same process while forking processess will have many processes split up

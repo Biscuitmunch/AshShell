@@ -1,3 +1,6 @@
+// Skylar Wells
+// jwel929
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
