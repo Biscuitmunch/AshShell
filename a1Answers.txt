@@ -1,0 +1,24 @@
+1:
+A fork creates a different process, without shared memory while a thread is a set of instructions running in one process with shared memory,
+you can have many threads but they will all still be running in the same process while forking processess will have many processes split up
+and running as separate instances.
+
+Calling execvp takes over the process and ends this process once the command has executed.
+
+In the situation of threads started by pthread create, there is still only one process running, meaning execvp will take over this
+process and exit the whole program ending every thread, rather than only the thread meant to be running the command.
+This will likely end the program early and will not carry out operations properly.
+
+This is where fork is useful, as fork creates separate processes, we can control which processes are being taken over by
+execvp and which are not. This means we can execute commands using execvp, while keeping our program running as intended 
+by creating forks made specifically to execute commands.
+
+The pipeline commands are multiple different commands that need to be run in conjunction with one another, and if we are not
+careful, execvp will end the program before we have finished running the command
+
+This is why it is important to use fork for each pipeline, as each section of the pipeline is running its own execvp command and
+we will need separate processes for each one of these own commands executing to not end the whole program unexpectedly.
+
+This is why pthread_create is lacking for our intended use and cannot be used in the pipeline command situation.
+
+2:
