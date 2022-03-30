@@ -148,15 +148,14 @@ void killCertainProcess(char *processNumInput)
    char *extraString = calloc(1000, 1);
    long processNum = strtol(words, &extraString, 10);
 
+   
    if (processNum == 0)
    {
       kill(mostRecentJob, SIGKILL);
-      deleteJob(processCounter);
    }
    else
    {
       kill(jobIDs[processNum], SIGKILL);
-      deleteJob(processNum);
    }
 
 }
